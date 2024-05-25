@@ -10,9 +10,11 @@ pip install -r requirements.txt
 
 ## How to run
 ```
-streamlit run main.py
-     
+streamlit run main.py   
 ```
+- Enter your question with error code
+- Wait for the answer
+- Click the button to show the PDF page
 
 ### Demo question list
 - I see code app_w304 on my dashboard what to do?
