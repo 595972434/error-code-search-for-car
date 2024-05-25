@@ -22,8 +22,12 @@ st.set_page_config(
 
 @st.cache_resource
 def load_base_model(model_path):
-    tokenizer = AutoTokenizer.from_pretrained(model_path + '/' + 'tokenizer')
-    base_model = AutoModel.from_pretrained(model_path + '/' + 'model')
+    # tokenizer = AutoTokenizer.from_pretrained(model_path + '/' + 'tokenizer')
+    # base_model = AutoModel.from_pretrained(model_path + '/' + 'model')
+
+    # download model directly
+    tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-base-en-v1.5')
+    base_model = AutoModel.from_pretrained('BAAI/bge-base-en-v1.5')
     base_model.eval()  # Set in inference mode. Turns off dropout etc.
     base_model.to("cpu")  # use cpu mode
     return base_model, tokenizer
