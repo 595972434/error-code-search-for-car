@@ -1,5 +1,4 @@
 import gc
-
 import numpy as np
 import streamlit as st
 import torch
@@ -20,28 +19,31 @@ st.set_page_config(
     }
 )
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Set the CUDA device to GPU 1
+if torch.cuda.is_available():
+    torch.cuda.set_device(1)
+    device = torch.device("cuda:1")
+else:
+    device = torch.device("cpu")
 
 @st.cache_resource
 def load_base_model(model_path):
     tokenizer = AutoTokenizer.from_pretrained(model_path + '/' + 'tokenizer')
     base_model = AutoModel.from_pretrained(model_path + '/' + 'model')
 
-    # download model directly
-    # tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-base-en-v1.5')
-    # base_model = AutoModel.from_pretrained('BAAI/bge-base-en-v1.5')
     base_model.eval()  # Set in inference mode. Turns off dropout etc.
-    base_model.to(device)  # use cpu mode
+    base_model.to(device)  # use GPU 1 or CPU mode
     return base_model, tokenizer
 
 
 @st.cache_resource
 def load_finetune_weight(model_path, weight_path):
     finetune_model = AutoModel.from_pretrained(model_path + '/' + 'model')
-    weights = torch.load(weight_path, map_location=torch.device(device))
+    weights = torch.load(weight_path, map_location=device)
     model_state = finetune_model.embeddings.state_dict()
     model_state['word_embeddings.weight'] = weights.T
     finetune_model.embeddings.load_state_dict(model_state)
+    finetune_model.to(device)  # use GPU 1 or CPU mode
     return finetune_model
 
 
@@ -53,8 +55,7 @@ def load_knowledge_file(filepath):
 
 
 def get_opensource_embeddings(inputs: list[str], model=None, tokenizer=None):
-    """Get embeddings with bge-base-en-v1.5 model.
-    """
+    """Get embeddings with bge-base-en-v1.5 model."""
     model.eval()
     if isinstance(inputs, np.ndarray):
         inputs = inputs.tolist()
@@ -69,10 +70,7 @@ def get_opensource_embeddings(inputs: list[str], model=None, tokenizer=None):
         with torch.no_grad():
             model_output = model(**encoded_input)
             sentence_embeddings = model_output[0][:, 0]
-        if device == 'cuda':
-            sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1).cpu().numpy()
-        else:
-            sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1).numpy()
+        sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1).cpu().numpy()
 
         ems.extend(sentence_embeddings)
         gc.collect()
@@ -138,8 +136,7 @@ def answer_question(user_query, knowledge_texts, model, tokenizer, only_semantic
     chunks_embedding = get_opensource_embeddings(knowledge_texts, model=model, tokenizer=tokenizer)
     query_embedding = get_opensource_embeddings(user_query, model=model, tokenizer=tokenizer)
 
-    relevant_page_semantic, page_no_semantic, top_5_idx_semantic = semantic_search(query_embedding, chunks_embedding,
-                                                                                   knowledge_texts)
+    relevant_page_semantic, page_no_semantic, top_5_idx_semantic = semantic_search(query_embedding, chunks_embedding, knowledge_texts)
     if only_semantic:
         return [int(result) + 1 for result in top_5_idx_semantic], int(page_no_semantic) + 1
     else:
@@ -148,7 +145,6 @@ def answer_question(user_query, knowledge_texts, model, tokenizer, only_semantic
         the_best_page_no = int(rrf_result[0][0]) + 1
         print(rrf_result)
         return [result[0] + 1 for result in rrf_result[:5]], the_best_page_no
-
 
 base_model, tokenizer = load_base_model(model_path="./model")
 finetune_model = load_finetune_weight(model_path="./model",
