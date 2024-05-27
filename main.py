@@ -20,6 +20,8 @@ st.set_page_config(
     }
 )
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 @st.cache_resource
 def load_base_model(model_path):
     tokenizer = AutoTokenizer.from_pretrained(model_path + '/' + 'tokenizer')
@@ -29,14 +31,14 @@ def load_base_model(model_path):
     # tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-base-en-v1.5')
     # base_model = AutoModel.from_pretrained('BAAI/bge-base-en-v1.5')
     base_model.eval()  # Set in inference mode. Turns off dropout etc.
-    base_model.to("cpu")  # use cpu mode
+    base_model.to(device)  # use cpu mode
     return base_model, tokenizer
 
 
 @st.cache_resource
 def load_finetune_weight(model_path, weight_path):
     finetune_model = AutoModel.from_pretrained(model_path + '/' + 'model')
-    weights = torch.load(weight_path, map_location=torch.device('cpu'))
+    weights = torch.load(weight_path, map_location=torch.device(device))
     model_state = finetune_model.embeddings.state_dict()
     model_state['word_embeddings.weight'] = weights.T
     finetune_model.embeddings.load_state_dict(model_state)
@@ -62,12 +64,16 @@ def get_opensource_embeddings(inputs: list[str], model=None, tokenizer=None):
     ems = []
     for i_batch in range(0, len(inputs), 32):
         text_batch = inputs[i_batch:i_batch + 32]
-        encoded_input = tokenizer(text_batch, padding=True, truncation=True, return_tensors='pt').to("cpu")
+        encoded_input = tokenizer(text_batch, padding=True, truncation=True, return_tensors='pt').to(device)
+
         with torch.no_grad():
             model_output = model(**encoded_input)
             sentence_embeddings = model_output[0][:, 0]
+        if device == 'cuda':
+            sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1).cpu().numpy()
+        else:
+            sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1).numpy()
 
-        sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1).cpu().numpy()
         ems.extend(sentence_embeddings)
         gc.collect()
         torch.cuda.empty_cache()
