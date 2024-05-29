@@ -7,3 +7,4 @@ streamlit
 streamlit_pdf_viewer
 transformers
 cryptography>=3.1
+openai

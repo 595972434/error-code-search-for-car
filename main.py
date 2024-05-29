@@ -2,6 +2,7 @@ import gc
 import numpy as np
 import streamlit as st
 import torch
+from openai import OpenAI
 from pypdf import PdfReader
 from rank_bm25 import BM25Okapi
 from streamlit_pdf_viewer import pdf_viewer
@@ -131,6 +132,31 @@ def rrf(all_rankings: list[list[int]]):
     sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     return sorted_scores
 
+def get_openai_response(messages):
+    """Get OpenAI response through REST API.
+    REST API is preferred, as the Python client can introduce breaking
+    changes whenever."""
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=messages)
+    answer = response.choices[0].message.content
+
+    return answer
+def get_openai_rag_response(query: str, sources: list[str]):
+    """Get RAG response based on query and list of strings as sources."""
+    messages = [{'role': 'system', 'content': f"""
+    You are chatbot for Tesla customer support. You must answer based on the relevant sources, delimited by three backticks:
+
+    Sources: ```{sources}```
+
+
+    Answer only based on the sources.
+    """}]
+    messages += [{"role": "user", "content": query}]
+    answer = get_openai_response(messages)
+
+    return answer
+
 
 def answer_question(user_query, knowledge_texts, model, tokenizer, only_semantic=False):
     chunks_embedding = get_opensource_embeddings(knowledge_texts, model=model, tokenizer=tokenizer)
@@ -138,18 +164,25 @@ def answer_question(user_query, knowledge_texts, model, tokenizer, only_semantic
 
     relevant_page_semantic, page_no_semantic, top_5_idx_semantic = semantic_search(query_embedding, chunks_embedding, knowledge_texts)
     if only_semantic:
-        return [int(result) + 1 for result in top_5_idx_semantic], int(page_no_semantic) + 1
+        response = get_openai_rag_response(user_query, [relevant_page_semantic])
+        return [int(result) + 1 for result in top_5_idx_semantic], int(page_no_semantic) + 1, response
     else:
         relevant_page_keyword, page_no_keyword, top_5_idx_keyword = keyword_search(user_query, knowledge_texts)
         rrf_result = rrf([top_5_idx_semantic, top_5_idx_keyword])
         the_best_page_no = int(rrf_result[0][0]) + 1
-        print(rrf_result)
-        return [result[0] + 1 for result in rrf_result[:5]], the_best_page_no
+        print(knowledge_texts[the_best_page_no-1])
+        response = get_openai_rag_response(user_query, [knowledge_texts[the_best_page_no-1]])
+        return [result[0] + 1 for result in rrf_result[:5]], the_best_page_no, response
 
 base_model, tokenizer = load_base_model(model_path="./model")
 finetune_model = load_finetune_weight(model_path="./model",
                                       weight_path="./data/embedding_weights_H.pt")
 knowledge_texts = load_knowledge_file(filepath="./data/Owners_Manual_tesla.pdf")
+client = OpenAI(
+    ## TODO add gm api key
+    api_key="gm key",
+    organization="gluon-meson",
+    base_url="http://bj.private.gluon-meson.tech:11000/model-proxy/v1")
 
 print("Loaded knowledge texts !!!!!!!!!")
 
@@ -183,19 +216,19 @@ with st.container(height=500):
         # with st.chat_message("user"):
         #     st.markdown(prompt)
         print("calling finetune model !!!")
-        finetune_model_matching_page_list, finetune_model_page_no = answer_question(user_query=prompt,
+        finetune_model_matching_page_list, finetune_model_page_no,finetune_model_answer = answer_question(user_query=prompt,
                                                                                     knowledge_texts=knowledge_texts,
 
                                                                                     model=finetune_model,
                                                                                     tokenizer=tokenizer)
         print("calling base model !!!")
-        base_model_matching_page_list, base_model_page_no = answer_question(user_query=prompt,
+        base_model_matching_page_list, base_model_page_no,base_model_answer = answer_question(user_query=prompt,
                                                                             knowledge_texts=knowledge_texts,
 
                                                                             model=base_model,
                                                                             tokenizer=tokenizer)
         print("calling only semantic !!!")
-        only_semantic_matching_page_list, only_semantic_page_no = answer_question(user_query=prompt,
+        only_semantic_matching_page_list, only_semantic_page_no,only_semantic_answer = answer_question(user_query=prompt,
                                                                             knowledge_texts=knowledge_texts,
                                                                             model=base_model,
                                                                             tokenizer=tokenizer,
@@ -205,12 +238,25 @@ with st.container(height=500):
         st.session_state.base_model_page = int(base_model_page_no)
         st.session_state.semantic_page = int(only_semantic_page_no)
         with messages.chat_message("assistant"):
-            response = f'''**Finetune Model**: The best matching page list is {','.join(str(page) for page in finetune_model_matching_page_list)}  
-                           **Base Model**: The best matching page list is {','.join(str(page) for page in base_model_matching_page_list)}   
-                           **Only Semantic**: The best matching page list is {','.join(str(page) for page in only_semantic_matching_page_list)}  '''
+            finetune_model_response = f'''**Finetune Model**: The best matching page list is {','.join(str(page) for page in finetune_model_matching_page_list)}  
+                           **Answer**: {finetune_model_answer}'''
 
-            st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.markdown(finetune_model_response)
+            st.session_state.messages.append({"role": "assistant", "content": finetune_model_response})
+
+        with messages.chat_message("assistant"):
+            base_model_response = f'''**Base Model**: The best matching page list is {','.join(str(page) for page in base_model_matching_page_list)}   
+                           **Answer**: {base_model_answer}'''
+
+            st.markdown(base_model_response)
+            st.session_state.messages.append({"role": "assistant", "content": base_model_response})
+
+        with messages.chat_message("assistant"):
+            semantic_response = f'''**Only Semantic**: The best matching page list is {','.join(str(page) for page in only_semantic_matching_page_list)}
+                                    **Answer**: {only_semantic_answer}'''
+
+            st.markdown(semantic_response)
+            st.session_state.messages.append({"role": "assistant", "content": semantic_response})
 
 
 with st.container():
