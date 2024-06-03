@@ -200,65 +200,74 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-with st.container(height=500):
-    st.title("Error Code Search App")
-    messages = st.container(height=300)
-    for message in st.session_state.messages:
-        with messages.chat_message(message["role"]):
-            st.markdown(message["content"])
+with st.container(height=600):
+    col1, col2 = st.columns([3,1])
 
-    # Accept user input
-    if prompt := st.chat_input("Input a question about Tesla error code?",):
-        messages.chat_message("user").markdown(prompt)
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        # # Display user message in chat message container
-        # with st.chat_message("user"):
-        #     st.markdown(prompt)
-        print("calling finetune model !!!")
-        finetune_model_matching_page_list, finetune_model_page_no,finetune_model_answer = answer_question(user_query=prompt,
-                                                                                    knowledge_texts=knowledge_texts,
+    with col1:
+        st.title("Enterprise Search Powered by GenAI")
+        messages = st.container(height=300)
+        for message in st.session_state.messages:
+            with messages.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-                                                                                    model=finetune_model,
-                                                                                    tokenizer=tokenizer)
-        print("calling base model !!!")
-        base_model_matching_page_list, base_model_page_no,base_model_answer = answer_question(user_query=prompt,
-                                                                            knowledge_texts=knowledge_texts,
+        # Accept user input
+        if prompt := st.chat_input("Input a question about Tesla error code?",):
+            messages.chat_message("user").markdown(prompt)
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            # # Display user message in chat message container
+            # with st.chat_message("user"):
+            #     st.markdown(prompt)
+            print("calling finetune model !!!")
+            finetune_model_matching_page_list, finetune_model_page_no,finetune_model_answer = answer_question(user_query=prompt,
+                                                                                        knowledge_texts=knowledge_texts,
 
-                                                                            model=base_model,
-                                                                            tokenizer=tokenizer)
-        print("calling only semantic !!!")
-        only_semantic_matching_page_list, only_semantic_page_no,only_semantic_answer = answer_question(user_query=prompt,
-                                                                            knowledge_texts=knowledge_texts,
-                                                                            model=base_model,
-                                                                            tokenizer=tokenizer,
-                                                                            only_semantic=True)
+                                                                                        model=finetune_model,
+                                                                                        tokenizer=tokenizer)
+            print("calling base model !!!")
+            base_model_matching_page_list, base_model_page_no,base_model_answer = answer_question(user_query=prompt,
+                                                                                knowledge_texts=knowledge_texts,
 
-        st.session_state.finetune_model_page = int(finetune_model_page_no)
-        st.session_state.base_model_page = int(base_model_page_no)
-        st.session_state.semantic_page = int(only_semantic_page_no)
-        with messages.chat_message("assistant"):
-            finetune_model_response = f'''**Finetune Model**: The best matching page list is {','.join(str(page) for page in finetune_model_matching_page_list)}  
-                           **Answer**: {finetune_model_answer}'''
+                                                                                model=base_model,
+                                                                                tokenizer=tokenizer)
+            print("calling only semantic !!!")
+            only_semantic_matching_page_list, only_semantic_page_no,only_semantic_answer = answer_question(user_query=prompt,
+                                                                                knowledge_texts=knowledge_texts,
+                                                                                model=base_model,
+                                                                                tokenizer=tokenizer,
+                                                                                only_semantic=True)
 
-            st.markdown(finetune_model_response)
-            st.session_state.messages.append({"role": "assistant", "content": finetune_model_response})
+            st.session_state.finetune_model_page = int(finetune_model_page_no)
+            st.session_state.base_model_page = int(base_model_page_no)
+            st.session_state.semantic_page = int(only_semantic_page_no)
+            with messages.chat_message("assistant"):
+                finetune_model_response = f'''**Finetune Model**: The best matching page list is {','.join(str(page) for page in finetune_model_matching_page_list)}  
+                               **Answer**: {finetune_model_answer}'''
 
-        with messages.chat_message("assistant"):
-            base_model_response = f'''**Base Model**: The best matching page list is {','.join(str(page) for page in base_model_matching_page_list)}   
-                           **Answer**: {base_model_answer}'''
+                st.markdown(finetune_model_response)
+                st.session_state.messages.append({"role": "assistant", "content": finetune_model_response})
 
-            st.markdown(base_model_response)
-            st.session_state.messages.append({"role": "assistant", "content": base_model_response})
+            with messages.chat_message("assistant"):
+                base_model_response = f'''**Base Model**: The best matching page list is {','.join(str(page) for page in base_model_matching_page_list)}   
+                               **Answer**: {base_model_answer}'''
 
-        with messages.chat_message("assistant"):
-            semantic_response = f'''**Only Semantic**: The best matching page list is {','.join(str(page) for page in only_semantic_matching_page_list)}
-                                    **Answer**: {only_semantic_answer}'''
+                st.markdown(base_model_response)
+                st.session_state.messages.append({"role": "assistant", "content": base_model_response})
 
-            st.markdown(semantic_response)
-            st.session_state.messages.append({"role": "assistant", "content": semantic_response})
+            with messages.chat_message("assistant"):
+                semantic_response = f'''**Only Semantic**: The best matching page list is {','.join(str(page) for page in only_semantic_matching_page_list)}
+                                        **Answer**: {only_semantic_answer}'''
 
+                st.markdown(semantic_response)
+                st.session_state.messages.append({"role": "assistant", "content": semantic_response})
+    with col2:
+        text = "Error code used to finetune model"
+        highlighted_text = f"<h2 style='color: gray'>{text}</h2>"
 
+        st.markdown(highlighted_text, unsafe_allow_html=True)
+        error_code = "APP_w009, APP_w048, APP_w207, APP_w218, APP_w221, APP_w222, APP_w224, APP_w304, BMS_a066, BMS_a067, BMS_a068, BMS_a069, CC_a001, CC_a002, CC_a003, CC_a004, CC_a005, CC_a006, CC_a007, CC_a008, CC_a009, CC_a010, CC_a011, CC_a012, CC_a013, CC_a014, CC_a015, CC_a016, CC_a017, CC_a018, CC_a019, CC_a020, CC_a021, CC_a022, CC_a023, CC_a024, CC_a025, CC_a026, CC_a027, CC_a028, CC_a029, CC_a030, CC_a041, CC_a043, CP_a004, CP_a010, CP_a043, CP_a046, CP_a051, CP_a053, CP_a054, CP_a055, CP_a056, CP_a058, CP_a066, CP_a078, CP_a079, CP_a101, CP_a102, CP_a143, CP_a151, DI_a138, DI_a166, DI_a175, DI_a184, DI_a185, DI_a190, DI_a245, DIF_a251, DIR_a251, EPBL_a195, EPBR_a195, ESP_a118, PCS_a016, PCS_a017, PCS_a019, PCS_a032, PCS_a052, PCS_a053, PCS_a054, PCS_a073, PCS_a090, PM_a092, PMR_a092, PMF_a092, UI_a004, UI_a006, UI_a013, UI_a014, UI_a137, UMC_a001, UMC_a002, UMC_a004, UMC_a005, UMC_a007, UMC_a008, UMC_a009, UMC_a010, UMC_a011, UMC_a012, UMC_a013, UMC_a014, UMC_a015, UMC_a016, UMC_a017, UMC_a018, UMC_a019, VCFRONT_a180, VCFRONT_a182, VCFRONT_a191, VCFRONT_a192, VCFRONT_a216, VCFRONT_a220, VCFRONT_a402, VCFRONT_a496, VCFRONT_a592, VCFRONT_a593, VCFRONT_a596, VCFRONT_a597, VCSEC_a221, VCSEC_a228"
+        text_format = f"<span style='font-style: italic'>{error_code}</span>"
+        st.markdown(text_format, unsafe_allow_html=True)
 with st.container():
     show_button = st.button("Show PDF page", type="primary")
     if show_button:
